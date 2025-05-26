@@ -1,0 +1,254 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --color-primary: #002366;
+  --color-bg: #f5f6fa;
+  --color-dark: #222;
+  --color-success: #16a34a;
+  --color-border: #e5e7eb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-dark);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Number inputlarda spin button gizle */
+.no-spinner::-webkit-outer-spin-button, .no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+}
+
+/* Butonlar */
+button, .btn {
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  font-weight: 600;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.04);
+}
+button:hover, .btn:hover {
+  background: #163a6b;
+}
+button:active, .btn:active {
+  background: #00194d;
+}
+
+/* Sekmeler container */
+.tab-bar, .tab-container {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tab {
+  background: transparent;
+  color: var(--color-dark);
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-weight: 600;
+  padding: 0.5rem 1.5rem;
+  transition: border 0.2s, color 0.2s, background 0.2s;
+  border-radius: 0.5rem 0.5rem 0 0;
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
+}
+.tab.active {
+  border-bottom: 2.5px solid var(--color-primary);
+  color: var(--color-primary);
+  background: #eaf0fa;
+  z-index: 2;
+}
+.tab:hover {
+  color: var(--color-primary);
+  background: #f0f6ff;
+}
+
+/* Kartlar ve paneller */
+.card, .panel, .shadow {
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 2px 16px 0 rgba(0,0,0,0.06);
+  padding: 2rem;
+}
+
+/* Tablolar */
+table {
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #fff;
+}
+th, td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+th {
+  background: #eaf0fa;
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+tr {
+  border-bottom: 1px solid var(--color-border);
+}
+tr:last-child {
+  border-bottom: none;
+}
+tr:hover {
+  background: #f0f6ff;
+}
+
+/* Formlar */
+input, select, textarea {
+  border: 1.5px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  background: #fff;
+  transition: border 0.2s, box-shadow 0.2s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--color-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px #eaf0fa;
+}
+label {
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+/* Sidebar modern stiller */
+.sidebar {
+  background: #fff;
+  border-top-right-radius: 2rem;
+  border-bottom-right-radius: 2rem;
+  box-shadow: 0 4px 32px 0 rgba(0,0,0,0.08);
+}
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1.5rem;
+  border-radius: 1rem;
+  color: #222;
+  font-size: 1.08rem;
+  font-weight: 500;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  margin-bottom: 0.1rem;
+}
+.sidebar-link .sidebar-icon {
+  font-size: 1.5rem;
+  color: #b0b8c9;
+  transition: color 0.18s;
+}
+.sidebar-link:hover, .sidebar-link.active {
+  background: #eaf0fa;
+  color: #002366;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.04);
+}
+.sidebar-link:hover .sidebar-icon, .sidebar-link.active .sidebar-icon {
+  color: #002366;
+}
+.sidebar-link.active {
+  font-weight: 700;
+}
+
+/* Profil avatarı */
+.sidebar .profile-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background: #eaf0fa;
+  color: #002366;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.04);
+}
+
+/* Boş veri mesajı */
+.empty-message {
+  color: #b0b8c9;
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.settings-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 2rem 1.5rem;
+  background: #fff;
+  border-radius: 1.5rem;
+  box-shadow: 0 2px 16px 0 rgba(0,0,0,0.06);
+  width: 18rem;
+  margin: 2rem auto 0 auto;
+}
+.settings-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 0.75rem;
+  color: #222;
+  font-size: 1.08rem;
+  font-weight: 500;
+  background: transparent;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  text-align: left;
+}
+.settings-menu-btn .text-lg {
+  font-size: 1.3rem;
+  color: #b0b8c9;
+  transition: color 0.18s;
+}
+.settings-menu-btn.active {
+  background: #eaf0fa;
+  color: #002366;
+  font-weight: 700;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.04);
+}
+.settings-menu-btn.active .text-lg {
+  color: #002366;
+}
+.settings-menu-btn:not(.active):hover {
+  background: #f0f6ff;
+  color: #002366;
+}
+.settings-menu-btn:not(.active):hover .text-lg {
+  color: #002366;
+}
