@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { FaSearch, FaDownload } from 'react-icons/fa';
+import { FaSearch, FaDownload, FaTimes } from 'react-icons/fa';
 
 interface Sozlesme {
   id: string;
@@ -118,9 +118,18 @@ export default function SozlesmelerTable() {
       )}
 
       {selectedSozlesme && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
-            <h2 className="text-xl font-bold mb-4">{selectedSozlesme.baslik}</h2>
+        <div className="fixed inset-0 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm w-full relative">
+            <button
+              onClick={() => setSelectedSozlesme(null)}
+              className="absolute top-3 right-3 p-1 rounded-full hover:bg-gray-200"
+            >
+              <FaTimes className="h-5 w-5 text-gray-600" />
+            </button>
+
+            <h2 className="text-xl font-bold mb-6 pr-8">
+              {selectedSozlesme.baslik}
+            </h2>
             <div className="space-y-4">
               <div>
                 <h3 className="font-semibold">NDA</h3>
@@ -151,12 +160,6 @@ export default function SozlesmelerTable() {
                 )}
               </div>
             </div>
-            <button
-              onClick={() => setSelectedSozlesme(null)}
-              className="mt-6 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-            >
-              Kapat
-            </button>
           </div>
         </div>
       )}

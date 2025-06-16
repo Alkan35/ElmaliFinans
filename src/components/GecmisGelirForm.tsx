@@ -26,10 +26,10 @@ function displayMoney(value: number | string): string { // paraBirimi parametres
 
 
 interface TaksitDetay {
-    taksitSirasi: number; // 1-based index of the installment in the sequence
-    label: string; // Custom label like "Ön Ödeme", "1. Taksit", "Final Ödemesi"
-    yuzde: number | '';
-    tutar: number | ''; // Sayı olarak saklayacağız
+    taksitSirasi: number;
+    label: string;
+    yuzde: number | ''; // String veya sayı olabilir
+    tutar: number | ''; // String veya sayı olabilir
     odemeTarihi: string; // YYYY-MM-DD formatında
 }
 
@@ -90,10 +90,13 @@ export default function GecmisGelirForm({ onClose }: GecmisGelirFormProps) {
 
         if (totalAmountNumber > 0) {
              yeniDetaylar.forEach(detay => {
+                 const currentTutar = Number(String(detay.tutar).replace(',', '.'));
+                 const currentYuzde = Number(String(detay.yuzde).replace(',', '.'));
+
                  if (detay.tutar !== '') {
-                      detay.yuzde = ((Number(detay.tutar) / totalAmountNumber) * 100);
+                      detay.yuzde = parseFloat(((currentTutar / totalAmountNumber) * 100).toFixed(2));
                  } else if (detay.yuzde !== '') {
-                      detay.tutar = (Number(detay.yuzde) / 100) * totalAmountNumber;
+                      detay.tutar = parseFloat(((currentYuzde / 100) * totalAmountNumber).toFixed(2));
                  } else {
                      detay.tutar = '';
                      detay.yuzde = '';
@@ -139,16 +142,22 @@ export default function GecmisGelirForm({ onClose }: GecmisGelirFormProps) {
     // Taksit detayı değişim handler'ı
     const handleTaksitDetayChange = (index: number, field: keyof Omit<TaksitDetay, 'label' | 'taksitSirasi'>, value: any) => {
         const newTaksitDetaylari = [...taksitDetaylari];
+
+        const numericValue = field === 'odemeTarihi' ? value : parseFloat(String(value).replace(',', '.'));
+
         if (field in newTaksitDetaylari[index]) {
-            (newTaksitDetaylari[index] as any)[field] = value;
+            (newTaksitDetaylari[index] as any)[field] = numericValue;
         }
 
         if ((field === 'tutar' || field === 'yuzde') && totalAmountNumber > 0) {
              const currentDetay = newTaksitDetaylari[index];
+             const currentTutar = Number(String(currentDetay.tutar).replace(',', '.'));
+             const currentYuzde = Number(String(currentDetay.yuzde).replace(',', '.'));
+
              if (field === 'tutar' && currentDetay.tutar !== '') {
-                  currentDetay.yuzde = ((Number(currentDetay.tutar) / totalAmountNumber) * 100);
+                  currentDetay.yuzde = parseFloat(((currentTutar / totalAmountNumber) * 100).toFixed(2));
              } else if (field === 'yuzde' && currentDetay.yuzde !== '') {
-                   currentDetay.tutar = (Number(currentDetay.yuzde) / 100) * totalAmountNumber;
+                   currentDetay.tutar = parseFloat(((currentYuzde / 100) * totalAmountNumber).toFixed(2));
              }
         }
 
@@ -400,7 +409,10 @@ export default function GecmisGelirForm({ onClose }: GecmisGelirFormProps) {
                             <input
                                 type="number"
                                 placeholder="Yüzde (%)"
-                                value={detay.yuzde === '' ? '' : Number(detay.yuzde).toFixed(2)}
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                value={detay.yuzde === '' ? '' : detay.yuzde}
                                 onChange={(e) => {
                                     const yuzde = Number(e.target.value);
                                      if (!isNaN(yuzde)) {
@@ -413,10 +425,12 @@ export default function GecmisGelirForm({ onClose }: GecmisGelirFormProps) {
                             />
                             <span className="text-gray-600">%</span>
                              <input
-                                type="text"
+                                type="number"
                                 inputMode="numeric"
                                 placeholder="Tutar"
-                                value={detay.tutar === '' ? '' : formatMoney(String(Math.round(Number(detay.tutar))))}
+                                min="0"
+                                step="0.01"
+                                value={detay.tutar === '' ? '' : detay.tutar}
                                 onChange={(e) => {
                                      const formattedValue = formatMoney(e.target.value);
                                      const numValue = Number(formattedValue.replace(/\./g, ''));

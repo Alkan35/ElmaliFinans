@@ -114,12 +114,13 @@ export default function GelirlerTable() {
 
       const unsubscribe = onSnapshot(gelirQuery, (snapshot) => {
           const gelirlerData = snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
+              ...doc.data(), // Belgenin kendi içeriği yayıldı
+              id: doc.id // Gerçek Firestore belge ID'si atandı (boş id'yi ezecek)
           })) as Gelir[];
 
-           // Filtreleme işlemini burada yapmıyoruz, sadece gelen veriyi set ediyoruz.
-           // Filtreleme useMemo içinde yapılmaya devam edecek.
+          console.log("GelirlerTable - onSnapshot: Fetched data count:", gelirlerData.length);
+          console.log("GelirlerTable - onSnapshot: First 5 IDs:", gelirlerData.slice(0, 5).map(g => g.id)); // İlk 5 kaydın ID'sini logla
+
           setGelirler(gelirlerData);
           setLoading(false);
       }, (err) => {

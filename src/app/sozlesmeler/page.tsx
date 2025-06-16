@@ -32,7 +32,7 @@ export default function Sozlesmeler() {
               isOpen={isModalOpen}
               onClose={() => setIsModalOpen(false)}
             >
-              <YeniSozlesmeForm />
+              <YeniSozlesmeForm onClose={() => setIsModalOpen(false)} />
             </Modal>
           </div>
         </div>

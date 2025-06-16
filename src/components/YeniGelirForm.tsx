@@ -173,7 +173,7 @@ export default function YeniGelirForm({ onClose }: YeniGelirFormProps) {
           id: '', // Firestore tarafından atanacak
           ad: gelirAdi,
           tur: 'tekSeferlik',
-          durum: 'bekleniyor', // Başlangıçta bekleniyor
+          durum: 'kesinlesen', // 'bekleniyor' yerine 'kesinlesen' olarak değiştirildi
           tutar: tutarNumber,
           paraBirimi: 'TL',
           odemeBeklenenTarih: odemeBeklenenTarih,
@@ -213,7 +213,7 @@ export default function YeniGelirForm({ onClose }: YeniGelirFormProps) {
                 id: '', // Firestore tarafından atanacak
                 ad: `${gelirAdi} - ${detay.taksitAdi}`, // Gelir Adı + Taksit Adı
                 tur: 'taksitli', // Taksitler de 'taksitli' türünde
-                durum: 'bekleniyor', // Başlangıçta bekleniyor
+                durum: 'kesinlesen', // 'bekleniyor' yerine 'kesinlesen' olarak değiştirildi
                 tutar: detay.hesaplananTutar, // Hesaplanan taksit tutarı
                 paraBirimi: 'TL',
                 odemeBeklenenTarih: detay.beklenenTarih, // YYYY-MM-DD formatında
