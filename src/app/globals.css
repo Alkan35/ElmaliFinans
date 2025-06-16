@@ -152,6 +152,14 @@ label {
   border-bottom-right-radius: 2rem;
   box-shadow: 0 4px 32px 0 rgba(0,0,0,0.08);
 }
+
+@media (max-width: 1023px) {
+  .sidebar {
+    border-radius: 0;
+    box-shadow: 0 0 50px 0 rgba(0,0,0,0.3);
+  }
+}
+
 .sidebar-link {
   display: flex;
   align-items: center;
@@ -163,6 +171,11 @@ label {
   font-weight: 500;
   transition: background 0.18s, color 0.18s, box-shadow 0.18s;
   margin-bottom: 0.1rem;
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
 }
 .sidebar-link .sidebar-icon {
   font-size: 1.5rem;
@@ -179,6 +192,39 @@ label {
 }
 .sidebar-link.active {
   font-weight: 700;
+}
+
+/* Sidebar alt menü linkleri */
+.sidebar-sub-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-radius: 0.75rem;
+  color: #555;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  margin-bottom: 0.05rem;
+  text-decoration: none;
+  border-left: 2px solid transparent;
+}
+.sidebar-sub-link .sidebar-sub-icon {
+  font-size: 1.2rem;
+  color: #b0b8c9;
+  transition: color 0.18s;
+}
+.sidebar-sub-link:hover, .sidebar-sub-link.active {
+  background: #f0f6ff;
+  color: #002366;
+  border-left-color: #002366;
+}
+.sidebar-sub-link:hover .sidebar-sub-icon, .sidebar-sub-link.active .sidebar-sub-icon {
+  color: #002366;
+}
+.sidebar-sub-link.active {
+  font-weight: 600;
+  background: #eaf0fa;
 }
 
 /* Profil avatarı */
@@ -198,57 +244,60 @@ label {
 
 /* Boş veri mesajı */
 .empty-message {
-  color: #b0b8c9;
-  font-size: 1.1rem;
   text-align: center;
-  padding: 2rem 0;
+  color: #6b7280;
+  background: #f9fafb;
+  padding: 3rem 2rem;
+  border-radius: 0.5rem;
+  border: 1px dashed #d1d5db;
 }
 
 .settings-menu {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding: 2rem 1.5rem;
-  background: #fff;
-  border-radius: 1.5rem;
-  box-shadow: 0 2px 16px 0 rgba(0,0,0,0.06);
-  width: 18rem;
-  margin: 2rem auto 0 auto;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
 }
+
 .settings-menu-btn {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.85rem 1.25rem;
-  border-radius: 0.75rem;
-  color: #222;
-  font-size: 1.08rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  color: #475569;
   font-weight: 500;
-  background: transparent;
-  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
-  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s ease;
   border: none;
-  outline: none;
+  background: transparent;
   text-align: left;
+  width: 100%;
 }
+
 .settings-menu-btn .text-lg {
-  font-size: 1.3rem;
-  color: #b0b8c9;
-  transition: color 0.18s;
+  color: #64748b;
+  transition: color 0.2s ease;
 }
+
 .settings-menu-btn.active {
-  background: #eaf0fa;
-  color: #002366;
-  font-weight: 700;
-  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.04);
+  background: #002366;
+  color: white;
+  box-shadow: 0 2px 4px 0 rgba(0,35,102,0.1);
 }
+
 .settings-menu-btn.active .text-lg {
-  color: #002366;
+  color: white;
 }
+
 .settings-menu-btn:not(.active):hover {
-  background: #f0f6ff;
-  color: #002366;
+  background: #e2e8f0;
+  color: #334155;
 }
+
 .settings-menu-btn:not(.active):hover .text-lg {
-  color: #002366;
+  color: #475569;
 }

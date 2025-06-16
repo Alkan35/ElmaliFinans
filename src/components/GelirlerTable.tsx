@@ -1,15 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, onSnapshot, orderBy, updateDoc, doc, Timestamp, Query } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy, Query } from 'firebase/firestore';
 import { db } from '@/lib/firebase'; // Firebase konfigürasyonunuzun yolu
-import { Gelir } from '@/lib/definitions'; // Gelir arayüzünüzün yolu
+import { Gelir } from '@/types/dashboard'; // Gelir arayüzünüzün yolu
 import { formatTarih } from '@/utils/dateUtils';
-import { tr } from 'date-fns/locale'; // Türkçe dil desteği
-// Modal artık filtre için kullanılmayacak, bu import kaldırılabilir
-// import Modal from '@/components/Modal';
-// GelirFiltreModal artık kullanılmayacak, bu import kaldırılabilir
-// import GelirFiltreModal from '@/components/GelirFiltreModal';
-// Yeni filtre panel component'ini import edin
 import GelirFiltrePanel from '@/components/GelirFiltrePanel';
+import OdemeModal from '@/components/OdemeModal';
 // Search icon için bir import ekleyelim, projenizde kullandığınız icon kütüphanesine göre değişebilir
 // Örneğin React Icons kullanıyorsanız:
 // import { FaSearch } from 'react-icons/fa';
@@ -23,35 +18,7 @@ function displayMoney(value: number | string): string {
     return `${value.toLocaleString('tr-TR')} TL`;
 }
 
-// Ay seçenekleri
-const aySecenekleri = [
-    { value: 0, label: 'Ocak' },
-    { value: 1, label: 'Şubat' },
-    { value: 2, label: 'Mart' },
-    { value: 3, label: 'Nisan' },
-    { value: 4, label: 'Mayıs' },
-    { value: 5, label: 'Haziran' },
-    { value: 6, label: 'Temmuz' },
-    { value: 7, label: 'Ağustos' },
-    { value: 8, label: 'Eylül' },
-    { value: 9, label: 'Ekim' },
-    { value: 10, label: 'Kasım' },
-    { value: 11, label: 'Aralık' },
-];
 
-// Ödeme Durumu seçenekleri
-const durumSecenekleri = [
-    { value: 'tahsilEdildi', label: 'Ödeme Alındı' },
-    { value: 'bekleniyor', label: 'Bekleniyor' },
-     { value: 'kesinlesen', label: 'Kesinleşen' }, // Firestore'da kullanılan kesinlesen durumu
-];
-
-// Ödeme Türü seçenekleri
-const turSecenekleri = [
-    { value: 'tekSeferlik', label: 'Tek Ödeme' },
-    { value: 'taksitli', label: 'Taksitli Ödeme' },
-    { value: 'aylikHizmet', label: 'Aylık Hizmet' },
-];
 
 export default function GelirlerTable() {
   const [activeTab, setActiveTab] = useState<'tumu' | 'gerceklesen' | 'kesinlesen'>('tumu');
@@ -72,6 +39,10 @@ export default function GelirlerTable() {
       status: null as string | null,
       type: null as string | null,
   });
+
+  // Ödeme modal state'leri
+  const [isOdemeModalOpen, setIsOdemeModalOpen] = useState(false);
+  const [selectedGelir, setSelectedGelir] = useState<Gelir | null>(null);
 
     // Filtreleri temizleme fonksiyonu
     const clearFilters = () => {
@@ -201,49 +172,9 @@ export default function GelirlerTable() {
 }, [gelirler, activeTab, searchQuery, filters]); // filters dependency'sini ekle
 
   // "Ödeme Alındı" butonuna basıldığında çalışacak fonksiyon
-  const handleOdemeAlindi = async (gelir: Gelir) => {
-    if (!gelir.id) {
-        alert("Gelir ID'si bulunamadı.");
-        return;
-    }
-
-    const confirmed = confirm(`${gelir.ad} için ödeme alındı olarak işaretlensin mi?`);
-    if (!confirmed) return;
-
-    try {
-        const gelirDocRef = doc(db, 'gelirler', gelir.id);
-
-        // Taksitli veya Aylık Hizmet ise kalan taksit sayısını güncelle
-        if (gelir.tur === 'taksitli' || gelir.tur === 'aylikHizmet') {
-            // Eğer bu kaydın taksit sırası son taksit sırasına eşitse durumu tahsilEdildi yap
-            // Aksi halde sadece durumunu tahsilEdildi yap ve kalanAy'ı azalt (bu mantık şu anki tek kayıt yapısı için uygun değil)
-            // Current logic assumes each payment is a separate doc for taksitli/aylikHizmet in firebase
-            // So marking one doc as 'tahsilEdildi' is sufficient for that specific installment.
-            // We should update the status to 'tahsilEdildi' and set the payment date.
-
-            await updateDoc(gelirDocRef, {
-                durum: 'tahsilEdildi',
-                odemeTarihi: new Date().toISOString().split('T')[0], // Bugünün tarihini YYYY-MM-DD formatında kaydet
-                // Kalan ay bilgisini güncellemek (eğer tek kayıt tutulsaydı):
-                // kalanAy: Math.max(0, (gelir.kalanAy || 0) - 1),
-                // Eğer her taksit/ay ayrı doc ise kalanAy zaten doc'a özeldir.
-                // Bu durumda sadece bu doc'un durumunu güncellemek yeterlidir.
-            });
-
-        } else {
-            // Tek seferlik gelir ise sadece durumu güncelle ve ödeme tarihini ekle
-            await updateDoc(gelirDocRef, {
-                durum: 'tahsilEdildi',
-                odemeTarihi: new Date().toISOString().split('T')[0], // Bugünün tarihini YYYY-MM-DD formatında kaydet
-            });
-        }
-
-        alert(`${gelir.ad} ödeme alındı olarak işaretlendi.`);
-        // UI otomatik olarak güncellenecektir (onSnapshot sayesinde)
-    } catch (error) {
-        console.error("Ödeme alındı olarak işaretlenirken hata:", error);
-        alert("Ödeme alındı olarak işaretlenirken bir hata oluştu.");
-    }
+  const handleOdemeAlindi = (gelir: Gelir) => {
+    setSelectedGelir(gelir);
+    setIsOdemeModalOpen(true);
   };
 
 
@@ -545,6 +476,13 @@ export default function GelirlerTable() {
                    &gt;
                             </span>
                           </div>
+
+           {/* Ödeme Modal */}
+           <OdemeModal
+               isOpen={isOdemeModalOpen}
+               onClose={() => setIsOdemeModalOpen(false)}
+               gelir={selectedGelir}
+           />
 
       </div>
   );

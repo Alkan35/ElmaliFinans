@@ -1,8 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, updateDoc, doc, addDoc, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { FaSearch, FaFilter } from 'react-icons/fa';
-import { addMonthsToDate } from '@/utils/dateUtils';
+import { 
+  Table, 
+  TableHeader, 
+  TableBody, 
+  TableRow, 
+  TableHeaderCell, 
+  TableCell, 
+  StatusBadge, 
+  ActionButton 
+} from '@/components/TableUtils';
+import GiderOdemeModal from '@/components/GiderOdemeModal';
 
 interface AltBaslik {
   id: string;
@@ -56,6 +66,10 @@ export default function GiderlerTable() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 13;
+
+  // Gider ödeme modal state'leri
+  const [isGiderOdemeModalOpen, setIsGiderOdemeModalOpen] = useState(false);
+  const [selectedGider, setSelectedGider] = useState<Gider | null>(null);
 
   useEffect(() => {
     const fetchBasliklar = async () => {
@@ -216,58 +230,9 @@ export default function GiderlerTable() {
     return `${gun}/${ay}/${yil}`;
   }
 
-  const handleOde = async (gider: Gider) => {
-    if (!window.confirm('Bu işlemi onaylıyor musunuz?')) return;
-
-      const now = new Date();
-    const gun = now.getDate().toString().padStart(2, '0');
-    const ay = (now.getMonth() + 1).toString().padStart(2, '0');
-    const yil = now.getFullYear();
-    const todayFormatted = `${gun}/${ay}/${yil}`;
-
-    if (gider.baslik === 'İşletme' && gider.altBaslik === 'Maaş') {
-      try {
-        await updateDoc(doc(db, 'giderler', gider.id), {
-          durum: 'gerceklesen',
-          odendi: true,
-          odemeTarihi: todayFormatted,
-        });
-        console.log(`Çalışan maaşı ödendi ve güncellendi: ${gider.id}, Ödeme Tarihi: ${todayFormatted}`);
-        return;
-      } catch (error) {
-        console.error("Çalışan maaşı güncellenirken hata oluştu:", error);
-        alert("Ödeme işlemi tamamlanamadı.");
-        return;
-      }
-    }
-
-    if (gider.tur === 'Düzenli') {
-        try {
-        await updateDoc(doc(db, 'giderler', gider.id), {
-            durum: 'gerceklesen',
-            odendi: true,
-            odemeTarihi: todayFormatted,
-          });
-           console.log(`Düzenli gider (ödenen taksit) güncellendi: ${gider.id}, Ödeme Tarihi: ${todayFormatted}`);
-        } catch (error) {
-          console.error("Düzenli gider (ödenen taksit) güncellenirken hata oluştu:", error);
-          alert("Ödeme işlemi tamamlanamadı.");
-          return;
-      }
-      return;
-    }
-
-    try {
-    await updateDoc(doc(db, 'giderler', gider.id), {
-      durum: 'gerceklesen',
-      odendi: true,
-        odemeTarihi: todayFormatted,
-      });
-       console.log(`Tek seferlik gider ödendi ve güncellendi: ${gider.id}, Ödeme Tarihi: ${todayFormatted}`);
-    } catch (error) {
-      console.error("Tek seferlik gider güncellenirken hata oluştu:", error);
-      alert("Ödeme işlemi tamamlanamadı.");
-    }
+  const handleOde = (gider: Gider) => {
+    setSelectedGider(gider);
+    setIsGiderOdemeModalOpen(true);
   };
 
   const filteredAndSortedGiderler = useMemo(() => {
@@ -437,7 +402,8 @@ export default function GiderlerTable() {
    }, [tab, appliedFilterStatus, appliedFilterBaslik, appliedFilterAltBaslik, appliedFilterAy, searchQuery]);
 
   return (
-    <div className="w-full">
+    <div className="w-full"
+      style={{ background: 'transparent' }}>
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-8">
           <button className={`pb-2 ${tab==='tum' ? 'border-b-2 border-green-500 text-green-600 font-semibold' : 'text-gray-500'}`} onClick={()=>{setTab('tum'); setIsFilterOpen(false); setSearchQuery(''); clearFilters();}}>Tümü</button>
@@ -545,127 +511,145 @@ export default function GiderlerTable() {
       ) : (
         <>
       {tab === 'tum' && (
-        <div className="overflow-x-auto rounded-lg shadow">
-          <table className="min-w-full bg-white">
-            <thead>
-              <tr className="text-xs text-gray-700 uppercase bg-gray-100">
-                <th className="px-4 py-2 font-bold">Gider Adı</th>
-                <th className="px-4 py-2 font-bold">Gider Başlığı</th>
-                <th className="px-4 py-2 font-bold">Gider Alt Başlığı</th>
-                    <th className="px-4 py-2 font-bold">Ödenmesi Gereken Tarih</th>
-                <th className="px-4 py-2 font-bold">Tutar</th>
-                <th className="px-4 py-2 font-bold">Ödeme Tarihi</th>
-                <th className="px-4 py-2 font-bold">Durum</th>
-              </tr>
-            </thead>
-            <tbody>
-                  {Array.isArray(paginatedGiderler) && paginatedGiderler.length === 0 ? (
-                    <tr><td colSpan={7} className="text-center py-8 text-gray-400">Filtreleme/arama sonucuna uygun kayıt bulunamadı.</td></tr>
-              ) : (
-                     Array.isArray(paginatedGiderler) ? paginatedGiderler.map(gider => (
-                  <tr key={gider.id} className="text-center border-b">
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{gider.ad || '-'}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{gider.baslik || '-'}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{gider.altBaslik || '-'}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{formatTarih(gider.sonOdemeTarihi)}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{typeof gider.tutar === 'number' ? Number(gider.tutar).toLocaleString() : '-'} TL</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">
-                          {gider.odemeTarihi ? formatTarih(gider.odemeTarihi) : '-'}
-                        </td>
-                    <td className="px-4 py-2">
-                          {gider.odendi === true ? (
-                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">Ödendi</span>
-                      ) : (
-                            <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs">Ödenmesi Gereken</span>
-                      )}
-                    </td>
-                  </tr>
-                    )) : (
-                       <tr><td colSpan={7} className="text-center py-8 text-red-500">Veri yüklenirken beklenmedik bir hata oluştu.</td></tr>
-                    )
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHeaderCell>Gider Adı</TableHeaderCell>
+              <TableHeaderCell>Gider Başlığı</TableHeaderCell>
+              <TableHeaderCell>Gider Alt Başlığı</TableHeaderCell>
+              <TableHeaderCell>Ödenmesi Gereken Tarih</TableHeaderCell>
+              <TableHeaderCell align="right">Tutar</TableHeaderCell>
+              <TableHeaderCell>Ödeme Tarihi</TableHeaderCell>
+              <TableHeaderCell>Durum</TableHeaderCell>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.isArray(paginatedGiderler) && paginatedGiderler.length === 0 ? (
+              <TableRow>
+                <TableCell className="text-center py-8 text-gray-400" style={{textAlign: 'center'}}>
+                  <span style={{display: 'block', gridColumn: '1 / -1'}}>Filtreleme/arama sonucuna uygun kayıt bulunamadı.</span>
+                </TableCell>
+              </TableRow>
+            ) : (
+              Array.isArray(paginatedGiderler) ? paginatedGiderler.map(gider => (
+                <TableRow key={gider.id}>
+                  <TableCell>{gider.ad || '-'}</TableCell>
+                  <TableCell>{gider.baslik || '-'}</TableCell>
+                  <TableCell>{gider.altBaslik || '-'}</TableCell>
+                  <TableCell>{formatTarih(gider.sonOdemeTarihi)}</TableCell>
+                  <TableCell align="right">{typeof gider.tutar === 'number' ? Number(gider.tutar).toLocaleString() : '-'} TL</TableCell>
+                  <TableCell>
+                    {gider.odemeTarihi ? formatTarih(gider.odemeTarihi) : '-'}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={gider.odendi === true ? 'odendi' : 'odenmesiGereken'}>
+                      {gider.odendi === true ? 'Ödendi' : 'Ödenmesi Gereken'}
+                    </StatusBadge>
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow>
+                  <TableCell className="text-center py-8 text-red-500" style={{textAlign: 'center'}}>
+                    <span style={{display: 'block', gridColumn: '1 / -1'}}>Veri yüklenirken beklenmedik bir hata oluştu.</span>
+                  </TableCell>
+                </TableRow>
+              )
+            )}
+          </TableBody>
+        </Table>
       )}
       {tab === 'gerceklesen' && (
-        <div className="overflow-x-auto rounded-lg shadow">
-          <table className="min-w-full bg-white">
-            <thead>
-              <tr className="text-xs text-gray-700 uppercase bg-gray-100">
-                <th className="px-4 py-2 font-bold">Gider Adı</th>
-                <th className="px-4 py-2 font-bold">Gider Başlığı</th>
-                <th className="px-4 py-2 font-bold">Gider Alt Başlığı</th>
-                     <th className="px-4 py-2 font-bold">Ödenmesi Gereken Tarih</th>
-                <th className="px-4 py-2 font-bold">Tutar</th>
-                <th className="px-4 py-2 font-bold">Ödeme Tarihi</th>
-              </tr>
-            </thead>
-            <tbody>
-                   {Array.isArray(paginatedGiderler) && paginatedGiderler.length === 0 ? (
-                    <tr><td colSpan={6} className="text-center py-8 text-gray-400">Filtreleme/arama sonucuna uygun gerçekleşen gider yok.</td></tr>
-              ) : (
-                     Array.isArray(paginatedGiderler) ? paginatedGiderler.map(gider => (
-                  <tr key={gider.id} className="text-center border-b">
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{gider.ad || '-'}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{gider.baslik || '-'}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{gider.altBaslik || '-'}</td>
-                         <td className="px-4 py-2 text-gray-900 font-semibold">{formatTarih(gider.sonOdemeTarihi)}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{typeof gider.tutar === 'number' ? Number(gider.tutar).toLocaleString() : '-'} TL</td>
-                         <td className="px-4 py-2 text-gray-900 font-semibold">
-                           {gider.odemeTarihi ? formatTarih(gider.odemeTarihi) : '-'}
-                         </td>
-                  </tr>
-                    )) : (
-                       <tr><td colSpan={6} className="text-center py-8 text-red-500">Veri yüklenirken beklenmedik bir hata oluştu.</td></tr>
-                    )
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHeaderCell>Gider Adı</TableHeaderCell>
+              <TableHeaderCell>Gider Başlığı</TableHeaderCell>
+              <TableHeaderCell>Gider Alt Başlığı</TableHeaderCell>
+              <TableHeaderCell>Ödenmesi Gereken Tarih</TableHeaderCell>
+              <TableHeaderCell align="right">Tutar</TableHeaderCell>
+              <TableHeaderCell>Ödeme Tarihi</TableHeaderCell>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.isArray(paginatedGiderler) && paginatedGiderler.length === 0 ? (
+              <TableRow>
+                <TableCell className="text-center py-8 text-gray-400" style={{textAlign: 'center'}}>
+                  <span style={{display: 'block', gridColumn: '1 / -1'}}>Filtreleme/arama sonucuna uygun gerçekleşen gider yok.</span>
+                </TableCell>
+              </TableRow>
+            ) : (
+              Array.isArray(paginatedGiderler) ? paginatedGiderler.map(gider => (
+                <TableRow key={gider.id}>
+                  <TableCell>{gider.ad || '-'}</TableCell>
+                  <TableCell>{gider.baslik || '-'}</TableCell>
+                  <TableCell>{gider.altBaslik || '-'}</TableCell>
+                  <TableCell>{formatTarih(gider.sonOdemeTarihi)}</TableCell>
+                  <TableCell align="right">{typeof gider.tutar === 'number' ? Number(gider.tutar).toLocaleString() : '-'} TL</TableCell>
+                  <TableCell>
+                    {gider.odemeTarihi ? formatTarih(gider.odemeTarihi) : '-'}
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow>
+                  <TableCell className="text-center py-8 text-red-500" style={{textAlign: 'center'}}>
+                    <span style={{display: 'block', gridColumn: '1 / -1'}}>Veri yüklenirken beklenmedik bir hata oluştu.</span>
+                  </TableCell>
+                </TableRow>
+              )
+            )}
+          </TableBody>
+        </Table>
       )}
       {tab === 'kesinlesen' && (
-        <div className="overflow-x-auto rounded-lg shadow">
-          <table className="min-w-full bg-white">
-            <thead>
-              <tr className="text-xs text-gray-700 uppercase bg-gray-100">
-                <th className="px-4 py-2 font-bold">Gider Adı</th>
-                <th className="px-4 py-2 font-bold">Gider Başlığı</th>
-                <th className="px-4 py-2 font-bold">Gider Alt Başlığı</th>
-                <th className="px-4 py-2 font-bold">Gider Türü</th>
-                <th className="px-4 py-2 font-bold">Kalan Ay</th>
-                <th className="px-4 py-2 font-bold">Ödenmesi Gereken Tarih</th>
-                <th className="px-4 py-2 font-bold">Tutar</th>
-                <th className="px-4 py-2 font-bold">İşlem</th>
-              </tr>
-            </thead>
-            <tbody>
-                   {Array.isArray(paginatedGiderler) && paginatedGiderler.length === 0 ? (
-                    <tr><td colSpan={8} className="text-center py-8 text-gray-400">Filtreleme/arama sonucuna uygun kesinleşen gider yok.</td></tr>
-              ) : (
-                     Array.isArray(paginatedGiderler) ? paginatedGiderler.map(gider => (
-                  <tr key={gider.id} className="text-center border-b hover:bg-green-50 transition">
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{gider.ad || '-'}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{gider.baslik || '-'}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{gider.altBaslik || '-'}</td>
-                    <td className="px-4 py-2 text-gray-900 font-semibold">{gider.tur || '-'}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{typeof gider.kalanAy === 'number' ? gider.kalanAy : '-'}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{formatTarih(gider.sonOdemeTarihi)}</td>
-                        <td className="px-4 py-2 text-gray-900 font-semibold">{typeof gider.tutar === 'number' ? Number(gider.tutar).toLocaleString() : '-'} TL</td>
-                    <td className="px-4 py-2">
-                          {gider.odendi === false && gider.durum === 'kesinlesen' && (
-                      <button onClick={()=>handleOde(gider)} className="bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold text-sm hover:bg-green-200 transition">Ödendi</button>
-                          )}
-                    </td>
-                  </tr>
-                    )) : (
-                      <tr><td colSpan={8} className="text-center py-8 text-red-500">Veri yüklenirken beklenmedik bir hata oluştu.</td></tr>
-                    )
-              )}
-            </tbody>
-          </table>
-        </div>
-          )}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHeaderCell>Gider Adı</TableHeaderCell>
+              <TableHeaderCell>Gider Başlığı</TableHeaderCell>
+              <TableHeaderCell>Gider Alt Başlığı</TableHeaderCell>
+              <TableHeaderCell>Gider Türü</TableHeaderCell>
+              <TableHeaderCell>Kalan Ay</TableHeaderCell>
+              <TableHeaderCell>Ödenmesi Gereken Tarih</TableHeaderCell>
+              <TableHeaderCell align="right">Tutar</TableHeaderCell>
+              <TableHeaderCell align="center">İşlem</TableHeaderCell>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.isArray(paginatedGiderler) && paginatedGiderler.length === 0 ? (
+              <TableRow>
+                <TableCell className="text-center py-8 text-gray-400">
+                  Filtreleme/arama sonucuna uygun kesinleşen gider yok.
+                </TableCell>
+              </TableRow>
+            ) : (
+              Array.isArray(paginatedGiderler) ? paginatedGiderler.map(gider => (
+                <TableRow key={gider.id}>
+                  <TableCell>{gider.ad || '-'}</TableCell>
+                  <TableCell>{gider.baslik || '-'}</TableCell>
+                  <TableCell>{gider.altBaslik || '-'}</TableCell>
+                  <TableCell>{gider.tur || '-'}</TableCell>
+                  <TableCell>{typeof gider.kalanAy === 'number' ? gider.kalanAy : '-'}</TableCell>
+                  <TableCell>{formatTarih(gider.sonOdemeTarihi)}</TableCell>
+                  <TableCell align="right">{typeof gider.tutar === 'number' ? Number(gider.tutar).toLocaleString() : '-'} TL</TableCell>
+                  <TableCell align="center">
+                    {gider.odendi === false && gider.durum === 'kesinlesen' && (
+                      <ActionButton onClick={() => handleOde(gider)}>
+                        Ödendi
+                      </ActionButton>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow>
+                  <TableCell className="text-center py-8 text-red-500">
+                    Veri yüklenirken beklenmedik bir hata oluştu.
+                  </TableCell>
+                </TableRow>
+              )
+            )}
+          </TableBody>
+        </Table>
+      )}
 
            {Array.isArray(paginatedGiderler) && paginatedGiderler.length > 0 && (
                <div className="mt-4 text-right font-bold text-lg text-gray-800">
@@ -698,6 +682,13 @@ export default function GiderlerTable() {
 
         </>
       )}
+
+      {/* Gider Ödeme Modal */}
+      <GiderOdemeModal
+        isOpen={isGiderOdemeModalOpen}
+        onClose={() => setIsGiderOdemeModalOpen(false)}
+        gider={selectedGider}
+      />
     </div>
   );
 } 

@@ -1,6 +1,5 @@
 'use client'; // Client component olduğumuzu belirtelim
 import { useState } from 'react';
-import Sidebar from '@/components/Sidebar'; // Sidebar bileşeninizin yolunu kontrol edin
 import Modal from '@/components/Modal'; // Modal bileşeninizin yolunu kontrol edin
 // Yeni oluşturduğumuz bileşenleri import edelim
 import GelirlerTable from '@/components/GelirlerTable'; // GelirlerTable bileşenini import et
@@ -29,77 +28,67 @@ export default function GelirlerPage() {
   const closeGecmisGelirModal = () => setIsGecmisGelirModalOpen(false);
 
   return (
-    <div className="flex">
-      {/* Sidebar */}
-      <Sidebar />
-      <main className="flex-1 ml-64 min-h-screen bg-gray-100">
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-3xl font-bold text-gray-800">Gelirler</h1>
-              <div className="space-x-4">
-                {/* Yeni Gelir Ekle butonu */}
+    <div className="w-full min-h-screen bg-gray-100">
+      <div className="p-4 lg:p-8">
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div className="p-4 lg:p-6 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">Gelirler</h1>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                 <button
                   onClick={openYeniGelirModal}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm lg:text-base"
                 >
                   Yeni Gelir Ekle
                 </button>
-                {/* Yeni buton: Aylık Hizmet Ekle */}
                 <button
                   onClick={openAylikHizmetModal}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors text-sm lg:text-base"
                 >
                   Aylık Hizmet Ekle
                 </button>
-                {/* Yeni Geçmiş Gelir Ekle Butonu */}
                 <button
                   onClick={openGecmisGelirModal}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm lg:text-base"
                 >
                   Geçmiş Gelir Ekle
                 </button>
               </div>
             </div>
-
-            {/* Gelirler Tabloları Bileşeni buraya gelecek */}
-            <GelirlerTable />
-
-            {/* Yeni Gelir Ekle Modalı */}
-            <Modal
-              isOpen={isYeniGelirModalOpen}
-              onClose={closeYeniGelirModal}
-              title="Yeni Gelir Ekle"
-            >
-              {/* Yeni Gelir Formu Bileşeni buraya gelecek */}
-              <YeniGelirForm onClose={closeYeniGelirModal} />
-            </Modal>
-
-            {/* Yeni Modal: Aylık Hizmet Ekle */}
-            <Modal
-              isOpen={isAylikHizmetModalOpen}
-              onClose={closeAylikHizmetModal}
-              title="Aylık Hizmet Ekle"
-            >
-              {/* Yeni Aylık Hizmet Formu Bileşeni buraya gelecek */}
-              <YeniAylikHizmetForm onClose={closeAylikHizmetModal} />
-            </Modal>
-
-            {/* Yeni Geçmiş Gelir Ekle Modal */}
-            <Modal
-              isOpen={isGecmisGelirModalOpen}
-              onClose={closeGecmisGelirModal}
-              title="Geçmiş Gelir Ekle"
-            >
-              {/* GecmisGelirForm component'ini buraya ekleyin */}
-              <GecmisGelirForm onClose={closeGecmisGelirModal} />
-            </Modal>
-
-            {/* Diğer Modallar (örn: Düzenleme Modalı) buraya gelebilir */}
-
           </div>
+
+          <div className="p-4 lg:p-6">
+            <GelirlerTable />
+          </div>
+
+          {/* Yeni Gelir Ekle Modalı */}
+          <Modal
+            isOpen={isYeniGelirModalOpen}
+            onClose={closeYeniGelirModal}
+            title="Yeni Gelir Ekle"
+          >
+            <YeniGelirForm onClose={closeYeniGelirModal} />
+          </Modal>
+
+          {/* Aylık Hizmet Ekle Modalı */}
+          <Modal
+            isOpen={isAylikHizmetModalOpen}
+            onClose={closeAylikHizmetModal}
+            title="Aylık Hizmet Ekle"
+          >
+            <YeniAylikHizmetForm onClose={closeAylikHizmetModal} />
+          </Modal>
+
+          {/* Geçmiş Gelir Ekle Modalı */}
+          <Modal
+            isOpen={isGecmisGelirModalOpen}
+            onClose={closeGecmisGelirModal}
+            title="Geçmiş Gelir Ekle"
+          >
+            <GecmisGelirForm onClose={closeGecmisGelirModal} />
+          </Modal>
         </div>
-      </main>
+      </div>
     </div>
   );
 } 

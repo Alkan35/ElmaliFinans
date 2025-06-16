@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-import Sidebar from '@/components/Sidebar';
 import SozlesmelerTable from '@/components/SozlesmelerTable';
 import Modal from '@/components/Modal';
 import YeniSozlesmeForm from '@/components/YeniSozlesmeForm';
@@ -9,34 +8,36 @@ export default function Sozlesmeler() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
-    <div className="flex">
-      <Sidebar />
-      <main className="flex-1 ml-64 min-h-screen bg-gray-100">
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-3xl font-bold text-gray-800">
+    <div className="w-full min-h-screen bg-gray-100">
+      <div className="p-4 lg:p-8">
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div className="p-4 lg:p-6 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-800">
                 Sözleşmeler
               </h1>
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm lg:text-base"
               >
                 Sözleşme Ekle
               </button>
             </div>
-
-            <SozlesmelerTable />
-
-            <Modal
-              isOpen={isModalOpen}
-              onClose={() => setIsModalOpen(false)}
-            >
-              <YeniSozlesmeForm onClose={() => setIsModalOpen(false)} />
-            </Modal>
           </div>
+
+          <div className="p-4 lg:p-6">
+            <SozlesmelerTable />
+          </div>
+
+          <Modal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            title="Sözleşme Ekle"
+          >
+            <YeniSozlesmeForm onClose={() => setIsModalOpen(false)} />
+          </Modal>
         </div>
-      </main>
+      </div>
     </div>
   );
 } 
