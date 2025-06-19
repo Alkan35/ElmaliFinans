@@ -4,12 +4,14 @@ import { db } from '@/lib/firebase';
 import { Timestamp } from 'firebase/firestore';
 import { AnaBaslik, AltBaslik } from '@/lib/definitions';
 import { addMonthsToDate } from '@/utils/dateUtils';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface YeniGiderFormProps {
   onClose?: () => void;
 }
 
 export default function YeniGiderForm({ onClose }: YeniGiderFormProps) {
+  const { currentCompany } = useCompany();
   const [ad, setAd] = useState('');
   const [baslik, setBaslik] = useState('');
   const [altBaslik, setAltBaslik] = useState('');
@@ -47,6 +49,13 @@ export default function YeniGiderForm({ onClose }: YeniGiderFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!currentCompany) {
+      alert("Lütfen önce bir şirket seçiniz.");
+      return;
+    }
+
+    const collectionName = `giderler-${currentCompany.id}`;
+
     try {
       if (tur === 'Tek Seferlik') {
         const giderData = {
@@ -61,7 +70,7 @@ export default function YeniGiderForm({ onClose }: YeniGiderFormProps) {
           createdAt: new Date(),
           odendi: false
         };
-        await addDoc(collection(db, 'giderler'), giderData);
+        await addDoc(collection(db, collectionName), giderData);
       } else {
         const ilkTarih = new Date(odemeTarihiInput);
         if (isNaN(ilkTarih.getTime())) {
@@ -87,7 +96,7 @@ export default function YeniGiderForm({ onClose }: YeniGiderFormProps) {
             toplamAy: kacAy,
             kalanAy: kacAy - i
           };
-          await addDoc(collection(db, 'giderler'), giderData);
+          await addDoc(collection(db, collectionName), giderData);
         }
       }
 

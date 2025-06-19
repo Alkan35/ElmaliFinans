@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Modal from './Modal';
 
 // Ay seçenekleri (GelirlerTable.tsx'ten kopyalandı veya utils'e taşınabilir)
 const aySecenekleri = [
@@ -32,28 +33,29 @@ const turSecenekleri = [
 
 
 interface GelirFiltreModalProps {
+  isOpen: boolean;
   activeTab: 'tumu' | 'gerceklesen' | 'kesinlesen';
-  currentFilters: {
+  filters: {
       expectedMonth: number | null;
       paidMonth: number | null;
       status: string | null;
       type: string | null;
   };
-  setFilters: (filters: GelirFiltreModalProps['currentFilters']) => void;
+  setFilters: (filters: GelirFiltreModalProps['filters']) => void;
   onClose: () => void;
 }
 
-export default function GelirFiltreModal({ activeTab, currentFilters, setFilters, onClose }: GelirFiltreModalProps) {
+export default function GelirFiltreModal({ isOpen, activeTab, filters, setFilters, onClose }: GelirFiltreModalProps) {
     // Modal içinde kendi geçici filtre state'ini tut
-    const [modalFilters, setModalFilters] = useState(currentFilters);
+    const [modalFilters, setModalFilters] = useState(filters);
 
-    // currentFilters dışarıdan değiştiğinde modal içindeki state'i güncelle
+    // filters dışarıdan değiştiğinde modal içindeki state'i güncelle
     useEffect(() => {
-        setModalFilters(currentFilters);
-    }, [currentFilters]);
+        setModalFilters(filters);
+    }, [filters]);
 
 
-    const handleFilterChange = (filterName: keyof GelirFiltreModalProps['currentFilters'], value: any) => {
+    const handleFilterChange = (filterName: keyof GelirFiltreModalProps['filters'], value: string | number) => {
         setModalFilters(prev => ({
             ...prev,
             [filterName]: value === '' ? null : value, // Seçilmediyse null yap
@@ -82,8 +84,15 @@ export default function GelirFiltreModal({ activeTab, currentFilters, setFilters
     };
 
 
+  if (!isOpen) return null;
+
   return (
-    <div className="space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Filtrele"
+    >
+      <div className="space-y-4">
         {/* Tümü sekmesi filtreleri */}
         {activeTab === 'tumu' && (
             <>
@@ -211,6 +220,7 @@ export default function GelirFiltreModal({ activeTab, currentFilters, setFilters
                  Uygula
              </button>
         </div>
-    </div>
+      </div>
+    </Modal>
   );
 } 

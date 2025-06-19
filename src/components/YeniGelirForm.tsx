@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { collection, addDoc, Timestamp, writeBatch, doc } from 'firebase/firestore'; // doc import edildi
 import { db } from '@/lib/firebase'; // Firebase konfigürasyonunuzun yolu
-import { Gelir } from '@/lib/definitions'; // Gelir arayüzünün yolu
-import { addMonthsToDate } from '@/utils/dateUtils'; // addMonthsToDate fonksiyonunun yolu
+import { Gelir } from '@/types/dashboard'; // Gelir arayüzünün yolu
+import { useCompany } from '@/contexts/CompanyContext';
 
 
 interface YeniGelirFormProps {
@@ -28,12 +28,13 @@ function displayMoney(value: number | string): string {
 
 
 export default function YeniGelirForm({ onClose }: YeniGelirFormProps) {
+  const { currentCompany } = useCompany();
   const [gelirAdi, setGelirAdi] = useState('');
   const [odemeTuru, setOdemeTuru] = useState<'tekSeferlik' | 'taksitli' | ''>('');
   const [tutar, setTutar] = useState('');
   const [odemeBeklenenTarih, setOdemeBeklenenTarih] = useState('');
   const [toplamTaksitSayisi, setToplamTaksitSayisi] = useState<number | ''>('');
-  const [kalanAy, setKalanAy] = useState<number | ''>('');
+  const [kalanAy, setKalanAy] = useState('');
 
   const [taksitDetaylari, setTaksitDetaylari] = useState<{
       yuzde: number | '';
@@ -156,6 +157,11 @@ export default function YeniGelirForm({ onClose }: YeniGelirFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!currentCompany) {
+      alert("Lütfen önce bir şirket seçiniz.");
+      return;
+    }
+
     if (!gelirAdi || !odemeTuru || !tutar || !odemeBeklenenTarih) {
       alert("Lütfen tüm zorunlu alanları doldurunuz.");
       return;
@@ -167,11 +173,14 @@ export default function YeniGelirForm({ onClose }: YeniGelirFormProps) {
     }
 
     try {
+      const collectionName = `gelirler-${currentCompany.id}`;
+      
       if (odemeTuru === 'tekSeferlik') {
         // Tek seferlik gelir kaydı
         const gelirData: Gelir = {
           id: '', // Firestore tarafından atanacak
           ad: gelirAdi,
+          baslik: gelirAdi, // baslik field'ı ekledik
           tur: 'tekSeferlik',
           durum: 'kesinlesen', // 'bekleniyor' yerine 'kesinlesen' olarak değiştirildi
           tutar: tutarNumber,
@@ -179,7 +188,7 @@ export default function YeniGelirForm({ onClose }: YeniGelirFormProps) {
           odemeBeklenenTarih: odemeBeklenenTarih,
           createdAt: Timestamp.now(), // Şimdiki zaman
         };
-        await addDoc(collection(db, 'gelirler'), gelirData);
+        await addDoc(collection(db, collectionName), gelirData);
 
       } else if (odemeTuru === 'taksitli') {
         // Taksitli gelir kayıtları (her taksit ayrı belge)
@@ -212,6 +221,7 @@ export default function YeniGelirForm({ onClose }: YeniGelirFormProps) {
              const taksitData: Gelir = {
                 id: '', // Firestore tarafından atanacak
                 ad: `${gelirAdi} - ${detay.taksitAdi}`, // Gelir Adı + Taksit Adı
+                baslik: `${gelirAdi} - ${detay.taksitAdi}`, // baslik field'ı ekledik
                 tur: 'taksitli', // Taksitler de 'taksitli' türünde
                 durum: 'kesinlesen', // 'bekleniyor' yerine 'kesinlesen' olarak değiştirildi
                 tutar: detay.hesaplananTutar, // Hesaplanan taksit tutarı
@@ -221,11 +231,10 @@ export default function YeniGelirForm({ onClose }: YeniGelirFormProps) {
                 // Taksit bilgileri
                 toplamTaksitSayisi: toplamTaksitSayisi as number, // Toplam Taksit Sayısı
                 taksitSirasi: index + 1, // 1'den başlayan sıra
-                taksitAdi: detay.taksitAdi,
                 // parentId: Ana Kayıt kaldırıldığı için burası boş kalabilir veya undefined
                  kalanAy: (toplamTaksitSayisi as number) - index, // kalanAy = Toplam Taksit - Taksit Sırası (0-indexed)
              };
-             const docRef = doc(collection(db, 'gelirler')); // Taksit için yeni belge referansı
+             const docRef = doc(collection(db, collectionName)); // Taksit için yeni belge referansı
              batch.set(docRef, taksitData); // Batch'e ekle
          });
 
@@ -337,7 +346,7 @@ export default function YeniGelirForm({ onClose }: YeniGelirFormProps) {
         <div className="space-y-4 max-h-60 overflow-y-auto pr-2 border rounded-md p-4 bg-gray-50">
           <h3 className="text-lg font-bold text-gray-800">Taksit Detayları</h3>
           {taksitDetaylari.map((detay, index) => (
-            <div key={index} className="flex items-center space-x-4 p-3 border rounded-md bg-white shadow-sm">
+            <div key={`taksit-${index}-${detay.taksitAdi}`} className="flex items-center space-x-4 p-3 border rounded-md bg-white shadow-sm">
               <div className="w-24 font-semibold text-gray-800">{detay.taksitAdi}</div>
               <div className="flex-1 grid grid-cols-3 gap-4">
                   <div>

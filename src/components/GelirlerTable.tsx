@@ -1,489 +1,345 @@
-import { useState, useEffect, useMemo } from 'react';
-import { collection, query, onSnapshot, orderBy, Query } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Firebase konfigürasyonunuzun yolu
-import { Gelir } from '@/types/dashboard'; // Gelir arayüzünüzün yolu
-import { formatTarih } from '@/utils/dateUtils';
-import GelirFiltrePanel from '@/components/GelirFiltrePanel';
-import OdemeModal from '@/components/OdemeModal';
-// Search icon için bir import ekleyelim, projenizde kullandığınız icon kütüphanesine göre değişebilir
-// Örneğin React Icons kullanıyorsanız:
-// import { FaSearch } from 'react-icons/fa';
+'use client';
 
-// Para formatlama ve birim ile gösterme fonksiyonu
-function displayMoney(value: number | string): string {
-    if (typeof value === 'string') {
-         value = Number(value.replace(/\./g, ''));
-    }
-    if (isNaN(value)) return `0 TL`;
-    return `${value.toLocaleString('tr-TR')} TL`;
-}
+import React, { useState, useEffect, useMemo } from 'react';
+import { collection, onSnapshot, query, orderBy, Query, DocumentData } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { useCompany } from '@/contexts/CompanyContext';
+import { Gelir } from '@/types/dashboard';
 
+// Modular table components
+import TumGelirlerTable from './gelirtable/TumGelirlerTable';
+import GerceklesenGelirlerTable from './gelirtable/GerceklesenGelirlerTable';
+import KesinlesenGelirlerTable from './gelirtable/KesinlesenGelirlerTable';
 
+import GelirFiltreModal from './GelirFiltreModal';
 
 export default function GelirlerTable() {
-  const [activeTab, setActiveTab] = useState<'tumu' | 'gerceklesen' | 'kesinlesen'>('tumu');
+  const { currentCompany } = useCompany();
   const [gelirler, setGelirler] = useState<Gelir[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Arama ve filtreleme state'leri buraya eklenebilir
-
-  // Arama state'leri
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Filtre state'leri (Filtre panelinin görünürlüğü için state eklendi)
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [filters, setFilters] = useState({ // Filtre değerleri için state
-      expectedMonth: null as number | null,
-      paidMonth: null as number | null,
-      status: null as string | null,
-      type: null as string | null,
+  const [activeTab, setActiveTab] = useState('tumu');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(25);
+  const [sortBy] = useState('createdAt');
+  const [filters, setFilters] = useState<{
+    expectedMonth: number | null;
+    paidMonth: number | null;
+    status: string | null;
+    type: string | null;
+  }>({
+    expectedMonth: null,
+    paidMonth: null,
+    status: null,
+    type: null
   });
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
-  // Ödeme modal state'leri
-  const [isOdemeModalOpen, setIsOdemeModalOpen] = useState(false);
-  const [selectedGelir, setSelectedGelir] = useState<Gelir | null>(null);
-
-    // Filtreleri temizleme fonksiyonu
-    const clearFilters = () => {
-        setFilters({
-            expectedMonth: null,
-            paidMonth: null,
-            status: null,
-            type: null,
-        });
-    };
-
-    // activeTab değiştiğinde filtreleri temizle
-    useEffect(() => {
-        clearFilters();
-         setIsSearchOpen(false); // Sekme değiştiğinde arama çubuğunu kapat
-         setIsFilterPanelOpen(false); // Sekme değiştiğinde filtre panelini kapat
-    }, [activeTab]);
-
-  // Firebase'den gelirleri çekme (real-time listener ile)
+  // Company-aware veri çekme
   useEffect(() => {
-      setLoading(true);
-      setError(null); // Her yeni sorguda hatayı temizle
+    if (!currentCompany) {
+      setGelirler([]);
+      setLoading(false);
+      return;
+    }
 
-      let gelirQuery: Query;
+    setLoading(true);
+    setError(null);
 
-      // Aktif sekmeye göre sıralama belirle
-      if (activeTab === 'tumu') {
-          // En son işlem yapılan veri en üstte (createdAt azalan)
-          gelirQuery = query(collection(db, 'gelirler'), orderBy('createdAt', 'desc'));
-      } else if (activeTab === 'gerceklesen') {
-          // Ödeme Tarihi günümüze en yakın en üstte (odemeTarihi azalan)
-           // Firebase'de string formatındaki tarihlerle azalan sıralama, taksitli/aylık hizmetlerdeki
-           // YYYY-MM-DD formatı için doğru çalışacaktır.
-          gelirQuery = query(collection(db, 'gelirler'), orderBy('odemeTarihi', 'desc'));
-      } else { // activeTab === 'kesinlesen'
-          // Ödeme Beklenen Tarih günümüze en yakın en üstte (odemeBeklenenTarih artan)
-           // Geleceğe doğru sıralama için artan (asc) kullanılır.
-           gelirQuery = query(collection(db, 'gelirler'), orderBy('odemeBeklenenTarih', 'asc'));
+    // Company-specific collection
+    const collectionName = `gelirler-${currentCompany.id}`;
+    let gelirQuery: Query<DocumentData>;
+
+    try {
+      if (sortBy === 'createdAt') {
+        gelirQuery = query(collection(db, collectionName), orderBy('createdAt', 'desc'));
+      } else if (sortBy === 'odemeTarihi') {
+        gelirQuery = query(collection(db, collectionName), orderBy('odemeTarihi', 'desc'));
+      } else if (sortBy === 'odemeBeklenenTarih') {
+        gelirQuery = query(collection(db, collectionName), orderBy('odemeBeklenenTarih', 'asc'));
+      } else {
+        gelirQuery = query(collection(db, collectionName), orderBy('createdAt', 'desc'));
       }
 
       const unsubscribe = onSnapshot(gelirQuery, (snapshot) => {
+        try {
           const gelirlerData = snapshot.docs.map(doc => ({
-              ...doc.data(), // Belgenin kendi içeriği yayıldı
-              id: doc.id // Gerçek Firestore belge ID'si atandı (boş id'yi ezecek)
+            id: doc.id,
+            ...doc.data()
           })) as Gelir[];
 
-          console.log("GelirlerTable - onSnapshot: Fetched data count:", gelirlerData.length);
-          console.log("GelirlerTable - onSnapshot: First 5 IDs:", gelirlerData.slice(0, 5).map(g => g.id)); // İlk 5 kaydın ID'sini logla
+          console.log(`GelirlerTable - onSnapshot: Fetched data count for ${currentCompany.name}:`, gelirlerData.length);
+          console.log("GelirlerTable - onSnapshot: First 5 IDs:", gelirlerData.slice(0, 5).map(g => g.id));
 
           setGelirler(gelirlerData);
           setLoading(false);
-      }, (err) => {
-          console.error("Error fetching or filtering gelirler:", err);
+        } catch (err) {
+          console.error(`Error fetching or filtering gelirler for ${currentCompany.name}:`, err);
           setError("Gelirler yüklenirken veya filtrelenirken hata oluştu.");
-      setLoading(false);
+          setLoading(false);
+        }
+      }, (err) => {
+        console.error(`Firestore listener error for ${collectionName}:`, err);
+        setError(`Gelirler dinlenirken hata oluştu: ${err.message}`);
+        setLoading(false);
       });
 
-      return () => unsubscribe(); // Cleanup function to unsubscribe from snapshot listener
-      // activeTab state'i değiştiğinde useEffect yeniden çalışacak ve yeni sorguyu başlatacak
-  }, [activeTab]); // activeTab'ı dependency olarak ekle
+      return () => unsubscribe();
+    } catch (err) {
+      console.error("Error setting up gelirler listener:", err);
+      setError("Gelirler listener kurulurken hata oluştu.");
+      setLoading(false);
+    }
+  }, [currentCompany, sortBy]);
 
-  // Tab filtrelemesi, Normal Filtreleme ve Arama filtrelemesi useMemo
+  // Filtrelenmiş gelirleri hesapla
   const filteredGelirler = useMemo(() => {
     if (!Array.isArray(gelirler)) return [];
 
-    // 1. Sekme filtrelemesi
     let data = gelirler;
-    switch (activeTab) {
-        case 'gerceklesen':
-            data = gelirler.filter(gelir => gelir.durum === 'tahsilEdildi');
-            break;
-        case 'kesinlesen':
-            data = gelirler.filter(gelir => gelir.durum === 'kesinlesen');
-            break;
-         // 'tumu' için filtreleme yok, doğrudan gelirler kullanılır
-    }
 
-    // 2. Normal Filtreleme (filters state'ine göre)
+    // Diğer filtreler
     if (filters.expectedMonth !== null) {
-         data = data.filter(gelir => {
-             if (!gelir.odemeBeklenenTarih) return false;
-             const date = new Date(gelir.odemeBeklenenTarih);
-             return !isNaN(date.getTime()) && date.getMonth() === filters.expectedMonth;
-         });
+      data = data.filter(gelir => {
+        const date = gelir.odemeBeklenenTarih ? new Date(gelir.odemeBeklenenTarih) : null;
+        return date && date.getMonth() === filters.expectedMonth;
+      });
     }
 
-     if (filters.paidMonth !== null) {
-         data = data.filter(gelir => {
-             if (!gelir.odemeTarihi) return false;
-             const date = new Date(gelir.odemeTarihi);
-             return !isNaN(date.getTime()) && date.getMonth() === filters.paidMonth;
-         });
+    if (filters.paidMonth !== null) {
+      data = data.filter(gelir => {
+        const date = gelir.odemeTarihi ? new Date(gelir.odemeTarihi) : null;
+        return date && date.getMonth() === filters.paidMonth;
+      });
     }
 
-     if (filters.status !== null) {
-         data = data.filter(gelir => gelir.durum === filters.status);
+    if (filters.status) {
+      data = data.filter(gelir => gelir.durum === filters.status);
     }
 
-     if (filters.type !== null) {
-         data = data.filter(gelir => gelir.tur === filters.type);
+    if (filters.type) {
+      data = data.filter(gelir => gelir.tur === filters.type);
     }
 
-    // Eğer arama sorgusu boş değilse 3. Arama filtrelemesi
-    if (searchQuery) {
-        const lowerCaseQuery = searchQuery.toLowerCase();
-        data = data.filter(gelir => {
-             // Arama yapılacak alanlar
-             if (gelir.ad?.toLowerCase().includes(lowerCaseQuery)) return true;
-             if (displayMoney(gelir.tutar).toLowerCase().includes(lowerCaseQuery)) return true;
-             if (gelir.odemeBeklenenTarih && formatTarih(gelir.odemeBeklenenTarih).toLowerCase().includes(lowerCaseQuery)) return true;
-             if (gelir.odemeTarihi && formatTarih(gelir.odemeTarihi).toLowerCase().includes(lowerCaseQuery)) return true;
+    return data;
+  }, [gelirler, filters]);
 
-             const odemeTuruText = gelir.tur === 'tekSeferlik' ? 'Tek Ödeme' : gelir.tur === 'taksitli' ? 'Taksitli Ödeme' : gelir.tur === 'aylikHizmet' ? 'Aylık Hizmet' : '';
-             if (odemeTuruText.toLowerCase().includes(lowerCaseQuery)) return true;
-
-             const durumText = gelir.durum === 'tahsilEdildi' ? 'Ödeme Alındı' : gelir.durum === 'bekleniyor' ? 'Bekleniyor' : gelir.durum === 'kesinlesen' ? 'Kesinleşen' : '';
-             if (durumText.toLowerCase().includes(lowerCaseQuery)) return true;
-
-             if (typeof gelir.kalanAy === 'number' && String(gelir.kalanAy).includes(searchQuery)) return true;
-             if (typeof gelir.kalanAy !== 'number' && gelir.kalanAy === '-' && lowerCaseQuery.includes('-')) return true;
-
-             return false;
-        });
-    }
-
-    return data; // Filtrelenmiş ve sıralanmış veri
-}, [gelirler, activeTab, searchQuery, filters]); // filters dependency'sini ekle
-
-  // "Ödeme Alındı" butonuna basıldığında çalışacak fonksiyon
-  const handleOdemeAlindi = (gelir: Gelir) => {
-    setSelectedGelir(gelir);
-    setIsOdemeModalOpen(true);
-  };
-
-
-  // Taksitli gelirler için kalan ay hesaplama veya gösterme mantığı
-  // Kesinleşen tablosunda her taksit ayrı satır olacağı için,
-  // o satırın kalanAy değerini göstermemiz yeterli olacaktır.
-  // Yeni Gelir Formu'nda kalanAy'ı nasıl kaydettiğinize bağlı olarak burası ayarlanır.
-  // Eğer formda 3, 2, 1 şeklinde kaydedildiyse, o değeri direkt gösteririz.
-  const renderKalanAy = (gelir: Gelir) => {
-      if (gelir.tur === 'taksitli' || gelir.tur === 'aylikHizmet') {
-           return typeof gelir.kalanAy === 'number' && gelir.kalanAy > 0 ? gelir.kalanAy : '-';
-      }
-       return '-';
-  };
-
-
-  // Tablo başlıklarını render etmek için yardımcı fonksiyon
-  const renderTableHeaders = () => {
-    if (activeTab === 'tumu') {
-      return (
-        <tr className="text-xs text-gray-700 uppercase bg-gray-100">
-          <th className="px-4 py-2 font-bold text-left">Gelir Adı</th>
-          <th className="px-4 py-2 font-bold text-left">Ödeme Beklenen Tarih</th>
-          <th className="px-4 py-2 font-bold text-right">Tutar</th>
-          <th className="px-4 py-2 font-left">Ödeme Tarihi</th>
-          <th className="px-4 py-2 font-left">Durum</th>
-        </tr>
-      );
-    } else if (activeTab === 'gerceklesen') {
-       return (
-         <tr className="text-xs text-gray-700 uppercase bg-gray-100">
-           <th className="px-4 py-2 font-bold text-left">Gelir Adı</th>
-           <th className="px-4 py-2 font-bold text-left">Ödeme Beklenen Tarih</th>
-           <th className="px-4 py-2 font-bold text-right">Tutar</th>
-           <th className="px-4 py-2 font-left">Ödeme Tarihi</th>
-         </tr>
-       );
+  // Tab'a göre filtrelenmiş gelirler
+  const tabFilteredGelirler = useMemo(() => {
+    if (activeTab === 'gerceklesen') {
+      return filteredGelirler.filter(gelir => gelir.durum === 'tahsilEdildi');
     } else if (activeTab === 'kesinlesen') {
-        return (
-          <tr className="text-xs text-gray-700 uppercase bg-gray-100">
-            <th className="px-4 py-2 font-bold text-left">Gelir Adı</th>
-            <th className="px-4 py-2 font-bold text-left">Ödeme Türü</th>
-            <th className="px-4 py-2 font-left">Kalan Ay</th>
-            <th className="px-4 py-2 font-left">Ödeme Beklenen Tarih</th>
-            <th className="px-4 py-2 font-bold text-right">Tutar</th>
-            <th className="px-4 py-2 font-center">İşlem</th>
-          </tr>
-        );
+      return filteredGelirler.filter(gelir => gelir.durum === 'kesinlesen');
     }
-    return null; // Varsayılan olarak null döner, bu durumda thead boş olur
-  };
+    return filteredGelirler; // 'tumu' için tüm gelirler
+  }, [filteredGelirler, activeTab]);
 
-
-  // Tablo içeriğini render etmek için yardımcı fonksiyon
-  const renderTableBody = (gelirler: Gelir[]) => {
-      if (loading) {
-          const colSpan = activeTab === 'tumu' ? 5 : activeTab === 'gerceklesen' ? 4 : 6;
-          return <tr><td colSpan={colSpan} className="text-center py-8 text-gray-500">Yükleniyor...</td></tr>;
-      }
-
-      // Filtreler uygulanmış veya arama yapılmış ve sonuç yoksa
-      if ((searchQuery || Object.values(filters).some(filter => filter !== null)) && gelirler.length === 0) {
-          const colSpan = activeTab === 'tumu' ? 5 : activeTab === 'gerceklesen' ? 4 : 6;
-          return <tr><td colSpan={colSpan} className="text-center py-8 text-gray-400">Seçili filtreler ve arama kriterleri ile eşleşen kayıt bulunamadı.</td></tr>;
-      }
-
-      // Genel olarak hiç veri yoksa
-      if (!Array.isArray(gelirler) || gelirler.length === 0) {
-          const colSpan = activeTab === 'tumu' ? 5 : activeTab === 'gerceklesen' ? 4 : 6;
-          return <tr><td colSpan={colSpan} className="text-center py-8 text-gray-400">Kayıt bulunamadı.</td></tr>;
-      }
-
-      return gelirler.map((gelir, index) => (
-          <tr key={gelir.id || index} className="text-sm text-gray-800 border-b hover:bg-gray-50 transition">
-              {/* Tüm tablar için ortak alanlar */}
-              <td className="px-4 py-2 text-left font-semibold">{gelir.ad || '-'}</td>
-
-              {activeTab === 'tumu' && (
-                <>
-                   {/* Tümü tabına özel alanlar */}
-                    <td className="px-4 py-2 text-left">{gelir.odemeBeklenenTarih ? formatTarih(gelir.odemeBeklenenTarih) : '-'}</td>
-                    <td className="px-4 py-2 text-right">{displayMoney(gelir.tutar)}</td>
-                    <td className="px-4 py-2 text-left">{gelir.odemeTarihi ? formatTarih(gelir.odemeTarihi) : '-'}</td>
-                    <td className="px-4 py-2 text-left">
-                        {gelir.durum === 'tahsilEdildi' ? (
-                            <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-semibold">Ödeme Alındı</span>
-                        ) : (
-                            <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-semibold">Bekleniyor</span>
-                        )}
-                    </td>
-                </>
-              )}
-
-              {activeTab === 'gerceklesen' && (
-                  <>
-                       {/* Gerçekleşen Gelirler tabına özel alanlar */}
-                       <td className="px-4 py-2 text-left">{gelir.odemeBeklenenTarih ? formatTarih(gelir.odemeBeklenenTarih) : '-'}</td>
-                       <td className="px-4 py-2 text-right">{displayMoney(gelir.tutar)}</td>
-                       <td className="px-4 py-2 text-left">{gelir.odemeTarihi ? formatTarih(gelir.odemeTarihi) : '-'}</td>
-                  </>
-              )}
-
-              {activeTab === 'kesinlesen' && (
-                   <>
-                       {/* Kesinleşen Gelirler tabına özel alanlar */}
-                       <td className="px-4 py-2 text-left">
-                           {gelir.tur === 'tekSeferlik' ? 'Tek Ödeme' : gelir.tur === 'taksitli' ? 'Taksitli Ödeme' : gelir.tur === 'aylikHizmet' ? 'Aylık Hizmet' : '-'}
-                        </td>
-                       <td className="px-4 py-2 text-left">{renderKalanAy(gelir)}</td>
-                       <td className="px-4 py-2 text-left">{gelir.odemeBeklenenTarih ? formatTarih(gelir.odemeBeklenenTarih) : '-'}</td>
-                       <td className="px-4 py-2 text-right">{displayMoney(gelir.tutar)}</td>
-                       <td className="px-4 py-2 text-center">
-                            {gelir.durum === 'kesinlesen' && (
-                                <button
-                                    onClick={() => handleOdemeAlindi(gelir)}
-                                    className="bg-green-500 text-white px-3 py-1 rounded-md text-xs font-semibold hover:bg-green-600 transition-colors"
-                                >
-                                    Ödeme Alındı
-                                </button>
-                            )}
-                            {gelir.durum === 'tahsilEdildi' && (
-                                <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-semibold">Tahsil Edildi</span>
-                            )}
-                       </td>
-                   </>
-              )}
-          </tr>
-      ));
-  };
-
-  // Sayfalama için yeni state'ler
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 13;
-
-  // Sayfalama için hesaplamalar
-  const totalItems = filteredGelirler.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-
-  // Sayfalanmış veri
-  const paginatedGelirler = useMemo(() => {
-    setCurrentPage(1); // Filtreler değiştiğinde ilk sayfaya dön
-    return filteredGelirler.slice(startIndex, endIndex);
-  }, [filteredGelirler, startIndex, endIndex]);
-
-  // Sayfa değiştirme fonksiyonları
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  // Toplam tutar hesaplama
-  const totalAmount = useMemo(() => {
-    return paginatedGelirler.reduce((sum, gelir) => {
-      return sum + (typeof gelir?.tutar === 'number' ? gelir.tutar : 0);
-    }, 0);
-  }, [paginatedGelirler]);
-
-  // Filtreler veya sekme değiştiğinde ilk sayfaya dön
+  // Sayfa değiştiğinde currentPage'i sıfırla
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, searchQuery, filters]);
+  }, [activeTab]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // Şirket yoksa gösterilecek mesaj
+  if (!currentCompany) {
+    return (
+      <div className="text-center py-16">
+        <div className="flex flex-col items-center justify-center space-y-6">
+          <div className="p-6 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-3xl">
+            <svg className="mx-auto h-16 w-16 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H7m2 0v-5a2 2 0 012-2h2a2 2 0 012 2v5" />
+          </svg>
+          </div>
+          <div className="text-center max-w-md">
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Şirket Seçiniz</h3>
+            <p className="text-gray-600 leading-relaxed">Gelir verilerini görüntülemek için önce bir şirket seçmeniz gerekmektedir.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading durumu
+  if (loading) {
+    return (
+      <div className="text-center py-16">
+        <div className="flex flex-col items-center justify-center space-y-6">
+          <div className="relative">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full animate-pulse"></div>
+            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          </div>
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Gelirler Yükleniyor</h3>
+            <p className="text-gray-600">Veriler hazırlanıyor, lütfen bekleyiniz...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error durumu
+  if (error) {
+    return (
+      <div className="text-center py-16">
+        <div className="flex flex-col items-center justify-center space-y-6">
+          <div className="p-6 bg-gradient-to-br from-red-100 to-pink-100 rounded-3xl">
+            <svg className="mx-auto h-16 w-16 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.996-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <div className="text-center max-w-md">
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Bir Hata Oluştu</h3>
+            <p className="text-gray-600 leading-relaxed">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Yeniden Dene
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const renderActiveTable = () => {
+    switch (activeTab) {
+      case 'gerceklesen':
+        return (
+          <GerceklesenGelirlerTable
+            gelirler={tabFilteredGelirler}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+          />
+        );
+      case 'kesinlesen':
+        return (
+          <KesinlesenGelirlerTable
+            gelirler={tabFilteredGelirler}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+          />
+        );
+      default:
+        return (
+          <TumGelirlerTable
+            gelirler={tabFilteredGelirler}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+          />
+        );
+    }
+  };
 
   return (
-      <div className="bg-white p-4 rounded-md shadow overflow-x-auto">
-          {/* Tablar ve Arama/Filtre alanı için üst container */}
-          <div className="mb-4 border-b border-gray-200 pb-3 flex justify-between items-center">
-              {/* Tab butonları */}
-              <nav className="flex space-x-8" aria-label="Tabs">
-                  {['tumu', 'gerceklesen', 'kesinlesen'].map((tab) => (
-          <button 
-                          key={tab}
-            className={`${
-                              activeTab === tab
-                                  ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                          } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200`}
-                          onClick={() => {
-                              setActiveTab(tab as 'tumu' | 'gerceklesen' | 'kesinlesen');
-                              setSearchQuery('');
-                              setIsSearchOpen(false);
-                              clearFilters();
-                           }}
-                      >
-                          {tab === 'tumu' && 'Tümü'}
-                          {tab === 'gerceklesen' && 'Gerçekleşen Gelirler'}
-                          {tab === 'kesinlesen' && 'Kesinleşen Gelirler'}
-          </button>
-                  ))}
-              </nav>
-
-               {/* Arama inputu ve butonları */}
-               <div className="flex items-center space-x-2">
-                   {/* Arama çubuğu - isSearchOpen true ise göster */}
-                    {isSearchOpen && (
-                        <input
-                           type="text"
-                           placeholder="Ara..."
-                           value={searchQuery}
-                           onChange={(e) => setSearchQuery(e.target.value)}
-                           className="w-full border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 font-semibold px-3 py-2"
-                           style={{ minWidth: '150px' }} // Minimum genişlik ayarı
-                        />
-                    )}
-                   {/* Arama ikonu butonu */}
-          <button 
-                       onClick={() => { setIsSearchOpen(!isSearchOpen); setIsFilterPanelOpen(false); }} // Arama iconuna basınca filtre panelini kapat
-                       className={`flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors ${!isSearchOpen && 'rounded-r-md'}`} // isSearchOpen kapalıysa sağ köşeyi yuvarla
-                       aria-label="Arama"
-                   >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-          </button>
-
-                   {/* Filtre butonu */}
-          <button 
-                       onClick={() => { setIsFilterPanelOpen(!isFilterPanelOpen); setIsSearchOpen(false); }} // Filtre iconuna basınca arama çubuğunu kapat
-                       className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                       aria-label="Filtrele"
-                   >
-                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7.172V4z"></path></svg>
-          </button>
-               </div>
+    <div className="space-y-8">
+      {/* Company Info with Modern Design */}
+      <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-blue-200/30 rounded-2xl p-6 backdrop-blur-sm">
+        <div className="flex items-center">
+          <div className="flex-shrink-0">
+            <div className="p-3 bg-blue-500/10 rounded-xl">
+              <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H7m2 0v-5a2 2 0 012-2h2a2 2 0 012 2v5" />
+            </svg>
+            </div>
+          </div>
+          <div className="ml-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              <span className="text-blue-600">{currentCompany.name}</span> şirketi
+            </h3>
+            <p className="text-gray-600 text-sm">
+              Gelir verileri görüntüleniyor
+            </p>
+          </div>
+        </div>
       </div>
 
-           {/* Filtre Panel Component'i - isFilterPanelOpen true ise göster */}
-            {isFilterPanelOpen && (
-                <div className="mb-4 p-4 bg-gray-50 rounded-md shadow-inner">
-                    <GelirFiltrePanel
-                        activeTab={activeTab}
-                        currentFilters={filters}
-                        setFilters={setFilters}
-                         // Panel içinde kapatma butonu olmayacak, state yönetimi üst componentte
-                         // onClose kaldırıldı
-                    />
-                </div>
-            )}
+      {/* Tab Navigation with Modern Design */}
+      <div className="bg-white/50 backdrop-blur-sm border border-white/20 rounded-2xl shadow-lg overflow-hidden transition-all duration-300 hover:shadow-xl">
+        <div className="border-b border-gray-200/50 bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
+          <nav className="flex space-x-4 p-4 overflow-x-auto">
+            {[
+              { 
+                id: 'tumu', 
+                label: 'Tüm Gelirler', 
+                count: filteredGelirler.length,
+                icon: (
+                  <svg className="w-5 h-5 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                )
+              },
+              { 
+                id: 'gerceklesen', 
+                label: 'Gerçekleşen', 
+                count: filteredGelirler.filter(g => g.durum === 'tahsilEdildi').length,
+                icon: (
+                  <svg className="w-5 h-5 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )
+              },
+              { 
+                id: 'kesinlesen', 
+                label: 'Kesinleşen', 
+                count: filteredGelirler.filter(g => g.durum === 'kesinlesen').length,
+                icon: (
+                  <svg className="w-5 h-5 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )
+              }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`${
+                  activeTab === tab.id
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/50'
+                } relative flex items-center space-x-3 px-5 py-3.5 rounded-xl font-medium text-sm transition-all duration-300 transform hover:scale-105 whitespace-nowrap ${
+                  activeTab === tab.id ? 'ring-2 ring-blue-300 ring-offset-2 ring-offset-blue-50/10' : ''
+                }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+                <span className={`${
+                  activeTab === tab.id ? 'bg-white/30 text-white' : 'bg-gray-200/80 text-gray-700'
+                } inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-colors shadow-sm ml-1.5`}>
+                  {tab.count}
+                </span>
+                {activeTab === tab.id && (
+                  <>
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 opacity-10"></div>
+                    <div className="absolute -bottom-px left-1/2 transform -translate-x-1/2 w-16 h-1 bg-blue-500 rounded-t-lg"></div>
+                  </>
+                )}
+              </button>
+            ))}
+          </nav>
+        </div>
 
-           {error && <div className="text-red-500 text-center py-4">{error}</div>}
-
-        <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-100">
-                  {renderTableHeaders()}
-          </thead>
-              <tbody className="divide-y divide-gray-200">
-                  {renderTableBody(paginatedGelirler)}
-              </tbody>
-          </table>
-
-           {/* Toplam tutar gösterimi */}
-           {Array.isArray(paginatedGelirler) && paginatedGelirler.length > 0 && (
-               <div className="mt-4 text-right font-bold text-lg text-gray-800">
-                   Toplam Tutar: {Number(totalAmount).toLocaleString('tr-TR')} TL
-                          </div>
-           )}
-
-           {/* Sayfalama kontrolleri */}
-           <div className="flex justify-center items-center mt-4 space-x-2">
-               <span
-                   onClick={handlePreviousPage}
-                   className={`font-semibold text-gray-700 cursor-pointer ${
-                       currentPage === 1 || !Array.isArray(filteredGelirler) || filteredGelirler.length === 0 
-                           ? 'opacity-50 cursor-not-allowed' 
-                           : 'hover:text-blue-600'
-                   }`}
-                   style={{ 
-                       pointerEvents: (currentPage === 1 || !Array.isArray(filteredGelirler) || filteredGelirler.length === 0) 
-                           ? 'none' 
-                           : 'auto' 
-                   }}
-               >
-                   &lt;
-                            </span>
-
-               <span className="font-semibold text-gray-700 mx-2">
-                   {totalPages > 0 ? currentPage : 0}
-                            </span>
-
-               <span
-                   onClick={handleNextPage}
-                   className={`font-semibold text-gray-700 cursor-pointer ${
-                       currentPage === totalPages || totalPages === 0 || !Array.isArray(filteredGelirler) || filteredGelirler.length === 0 
-                           ? 'opacity-50 cursor-not-allowed' 
-                           : 'hover:text-blue-600'
-                   }`}
-                   style={{ 
-                       pointerEvents: (currentPage === totalPages || totalPages === 0 || !Array.isArray(filteredGelirler) || filteredGelirler.length === 0) 
-                           ? 'none' 
-                           : 'auto' 
-                   }}
-               >
-                   &gt;
-                            </span>
-                          </div>
-
-           {/* Ödeme Modal */}
-           <OdemeModal
-               isOpen={isOdemeModalOpen}
-               onClose={() => setIsOdemeModalOpen(false)}
-               gelir={selectedGelir}
-           />
-
+        {/* Render Active Table */}
+        {renderActiveTable()}
       </div>
+
+      {/* Mobile Filter Modal */}
+      <GelirFiltreModal
+        isOpen={isMobileFilterOpen}
+        onClose={() => setIsMobileFilterOpen(false)}
+        filters={filters}
+        setFilters={setFilters}
+        activeTab={activeTab as 'tumu' | 'gerceklesen' | 'kesinlesen'}
+      />
+    </div>
   );
 } 
