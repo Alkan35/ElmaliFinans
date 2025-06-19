@@ -44,51 +44,64 @@ export default function CompanySelector() {
       {/* Current Company Display */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 rounded-lg px-3 py-2 text-white transition-colors duration-200"
+        className="flex items-center space-x-3 bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-xl px-4 py-3 text-white transition-all duration-300 border border-white/20 shadow-lg hover:shadow-xl transform hover:scale-105"
       >
-        <FiBriefcase className="h-4 w-4" />
-        <span className="text-sm font-medium">
+        <div className="p-1.5 bg-white/20 rounded-lg">
+          <FiBriefcase className="h-4 w-4" />
+        </div>
+        <span className="text-sm font-semibold tracking-wide">
           {currentCompany?.name || 'Şirket Seçiniz'}
         </span>
-        <FiChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <FiChevronDown className={`h-4 w-4 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-          <div className="py-2">
-            {/* Company List */}
-            <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Şirketleriniz
+        <div className="absolute top-full left-0 mt-3 w-72 bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/10 z-50 overflow-hidden">
+          <div className="py-3">
+            {/* Company List Header */}
+            <div className="px-4 py-3 border-b border-white/10">
+              <h3 className="text-xs font-bold text-white/80 uppercase tracking-wider">
+                Şirketleriniz
+              </h3>
             </div>
             
-            {userCompanies.map((company) => (
-              <button
-                key={company.id}
-                onClick={() => handleCompanySelect(company)}
-                className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-50 transition-colors duration-150"
-              >
-                <div className="flex items-center space-x-2">
-                  <FiBriefcase className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-700">{company.name}</span>
-                </div>
-                {currentCompany?.id === company.id && (
-                  <FiCheck className="h-4 w-4 text-blue-600" />
-                )}
-              </button>
-            ))}
+            {/* Company List */}
+            <div className="py-2">
+              {userCompanies.map((company) => (
+                <button
+                  key={company.id}
+                  onClick={() => handleCompanySelect(company)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/10 transition-all duration-200 group"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="p-1.5 bg-white/10 rounded-lg group-hover:bg-white/20 transition-colors duration-200">
+                      <FiBriefcase className="h-4 w-4 text-white/80" />
+                    </div>
+                    <span className="text-sm font-medium text-white">{company.name}</span>
+                  </div>
+                  {currentCompany?.id === company.id && (
+                    <div className="p-1 bg-emerald-500/20 rounded-full">
+                      <FiCheck className="h-3 w-3 text-emerald-400" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
 
             {/* Divider */}
-            <div className="border-t border-gray-200 my-2"></div>
+            <div className="border-t border-white/10 my-2"></div>
 
             {/* Şirket Yönetimi Linki */}
             <Link 
               href="/dashboard/ayarlar/sirket-yonetimi"
-              className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-gray-50 transition-colors duration-150"
+              className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-white/10 transition-all duration-200 group"
               onClick={() => setIsOpen(false)}
             >
-              <FiSettings className="h-4 w-4 text-blue-600" />
-              <span className="text-sm text-blue-600 font-medium">Şirket Yönetimi</span>
+              <div className="p-1.5 bg-blue-500/20 rounded-lg group-hover:bg-blue-500/30 transition-colors duration-200">
+                <FiSettings className="h-4 w-4 text-blue-400" />
+              </div>
+              <span className="text-sm font-semibold text-white">Şirket Yönetimi</span>
             </Link>
           </div>
         </div>
@@ -97,7 +110,7 @@ export default function CompanySelector() {
       {/* Overlay to close dropdown */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40"
+          className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
           onClick={() => setIsOpen(false)}
         />
       )}

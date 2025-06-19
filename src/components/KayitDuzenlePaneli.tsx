@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, deleteDoc, doc, updateDoc, Timestamp, Query } from 'firebase/firestore';
-import { FaEdit, FaCheck, FaTimes, FaTrash, FaDownload } from 'react-icons/fa';
+import { collection, onSnapshot, deleteDoc, doc, updateDoc, Timestamp, Query, writeBatch } from 'firebase/firestore';
 import { ref, deleteObject, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
+import { FaEdit, FaCheck, FaTimes, FaTrash, FaDownload } from 'react-icons/fa';
+import { useCompany } from '@/contexts/CompanyContext';
 
 function formatTarih(dateInput: Date | string | Timestamp | undefined | null): string {
     if (!dateInput) return '-';
@@ -140,6 +140,7 @@ interface Sozlesme {
 }
 
 export default function KayitDuzenlePaneli() {
+  const { currentCompany } = useCompany();
   const [tab, setTab] = useState<'gelir' | 'gider' | 'sozlesme'>('gider');
   const [gelirler, setGelirler] = useState<Gelir[]>([]);
   const [giderler, setGiderler] = useState<Gider[]>([]);
@@ -160,37 +161,38 @@ export default function KayitDuzenlePaneli() {
   const [editSozlesmeModal, setEditSozlesmeModal] = useState<{ open: boolean, sozlesme: Sozlesme | null }>({ open: false, sozlesme: null });
 
   useEffect(() => {
-    // Tüm verileri çekme işlemini onSnapshot ile real-time yapalım
-      setLoading(true);
+    if (!currentCompany) {
+      setGiderler([]);
+      setGelirler([]);
+      setSozlesmeler([]);
+      setLoading(false);
+      return;
+    }
 
-    // Giderler listener
-    const unsubscribeGiderler = onSnapshot(collection(db, 'giderler'), (snapshot) => {
+    // Giderler listener (şirkete özel)
+    const unsubscribeGiderler = onSnapshot(collection(db, `giderler-${currentCompany.id}`), (snapshot) => {
       const fetchedGiderler = snapshot.docs.map(doc => ({
            ...doc.data(),
            id: doc.id,
       })) as Gider[];
       setGiderler(fetchedGiderler);
-      // setLoading(false); // Bu satır kaldırıldı
     }, (error) => {
         console.error("Giderler çekilirken hata oluştu:", error);
-         // setLoading(false); // Bu satır kaldırıldı
     });
 
-    // Gelirler listener
-    const unsubscribeGelirler = onSnapshot(collection(db, 'gelirler'), (snapshot) => {
+    // Gelirler listener (şirkete özel)  
+    const unsubscribeGelirler = onSnapshot(collection(db, `gelirler-${currentCompany.id}`), (snapshot) => {
       const fetchedGelirler = snapshot.docs.map(doc => ({
            ...doc.data(),
            id: doc.id,
       })) as Gelir[];
       setGelirler(fetchedGelirler);
-       // setLoading(false); // Bu satır kaldırıldı
     }, (error) => {
         console.error("Gelirler çekilirken hata oluştu:", error);
-        // setLoading(false); // Bu satır kaldırıldı
     });
 
-    // Sözleşmeler listener eklendi
-    const unsubscribeSozlesmeler = onSnapshot(collection(db, 'sozlesmeler'), (snapshot) => {
+    // Sözleşmeler listener (şirkete özel)
+    const unsubscribeSozlesmeler = onSnapshot(collection(db, `sozlesmeler-${currentCompany.id}`), (snapshot) => {
         const fetchedSozlesmeler = snapshot.docs.map(doc => ({
              ...doc.data(),
              id: doc.id,
@@ -202,14 +204,13 @@ export default function KayitDuzenlePaneli() {
         setLoading(false); // Hata durumunda da loading false
     });
 
-
     // Cleanup function: component unmount edildiğinde listenerları kapat
     return () => {
       unsubscribeGiderler();
       unsubscribeGelirler();
       unsubscribeSozlesmeler();
     };
-  }, []); // Boş dependency array: sadece ilk renderda çalışır
+  }, [currentCompany]); // currentCompany dependency'si eklendi
 
   // Sözleşme düzenleme modalı açıldığında state'leri doldur
   useEffect(() => {
@@ -262,8 +263,9 @@ export default function KayitDuzenlePaneli() {
                     }
                 }
             }
-             // Firestore belgesini sil
-             await deleteDoc(doc(db, 'sozlesmeler', id));
+             // Firestore belgesini şirket koleksiyonundan sil
+             const collectionName = `sozlesmeler-${currentCompany?.id}`;
+             await deleteDoc(doc(db, collectionName, id));
 
         } else {
              // Gider veya Gelir silme (mevcut mantık)
@@ -451,7 +453,9 @@ export default function KayitDuzenlePaneli() {
           }
 
 
-          // Firestore belgesini güncelle
+          // Firestore belgesini şirket koleksiyonunda güncelle
+          const collectionName = `sozlesmeler-${currentCompany?.id}`;
+          const sozlesmeDocRef = doc(db, collectionName, sozlesmeId);
           await updateDoc(sozlesmeDocRef, {
               baslik: sozlesmeEditBaslik,
               ndaUrl: updatedNdaUrl,
@@ -628,7 +632,7 @@ export default function KayitDuzenlePaneli() {
                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <button
-                                                onClick={() => setEditModal({ open: true, gider: sozlesme as Gider })}
+                                                onClick={() => setEditSozlesmeModal({ open: true, sozlesme: sozlesme })}
                                                 className="text-blue-600 hover:text-blue-900 mr-4"
                                                 title="Düzenle"
                                             >

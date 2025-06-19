@@ -27,7 +27,7 @@ export function useGelirler() {
     const collectionName = `gelirler-${currentCompany.id}`;
     const gelirlerQuery = query(
       collection(db, collectionName),
-      orderBy('tarih', 'desc')
+      orderBy('createdAt', 'desc')
     );
 
     const unsubscribe = onSnapshot(
@@ -37,6 +37,7 @@ export function useGelirler() {
           id: doc.id,
           ...doc.data()
         })) as Gelir[];
+        console.log(`useGelirler - ${collectionName} veri sayısı:`, fetchedGelirler.length);
         setGelirler(fetchedGelirler);
         setLoading(false);
       },
@@ -74,7 +75,7 @@ export function useGiderler() {
     const collectionName = `giderler-${currentCompany.id}`;
     const giderlerQuery = query(
       collection(db, collectionName),
-      orderBy('tarih', 'desc')
+      orderBy('createdAt', 'desc')
     );
 
     const unsubscribe = onSnapshot(
@@ -84,6 +85,7 @@ export function useGiderler() {
           id: doc.id,
           ...doc.data()
         })) as Gider[];
+        console.log(`useGiderler - ${collectionName} veri sayısı:`, fetchedGiderler.length);
         setGiderler(fetchedGiderler);
         setLoading(false);
       },

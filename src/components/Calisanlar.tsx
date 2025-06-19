@@ -3,6 +3,7 @@ import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, query, where, writeBatch } from 'firebase/firestore';
 import { Timestamp } from 'firebase/firestore';
 import { addMonthsToDate } from '@/utils/dateUtils';
+import { useCompany } from '@/contexts/CompanyContext';
 
 interface Calisan {
   id: string;
@@ -19,6 +20,7 @@ function formatMoney(value: string) {
 }
 
 export default function Calisanlar() {
+  const { currentCompany } = useCompany();
   const [modalOpen, setModalOpen] = useState(false);
   const [calisanlar, setCalisanlar] = useState<Calisan[]>([]);
   const [isim, setIsim] = useState('');
@@ -29,8 +31,17 @@ export default function Calisanlar() {
   useEffect(() => {
     const fetchCalisanlar = async () => {
       setLoading(true);
+      
+      if (!currentCompany) {
+        setCalisanlar([]);
+        setLoading(false);
+        return;
+      }
+
       try {
-          const snap = await getDocs(collection(db, 'calisanlar'));
+          // Şirkete özel çalışanlar koleksiyonu
+          const collectionName = `calisanlar-${currentCompany.id}`;
+          const snap = await getDocs(collection(db, collectionName));
           setCalisanlar(snap.docs.map(doc => {
               const data = doc.data();
               return {
@@ -47,10 +58,15 @@ export default function Calisanlar() {
       setLoading(false);
     };
     fetchCalisanlar();
-  }, []);
+  }, [currentCompany]);
 
   const handleEkle = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!currentCompany) {
+      alert('Lütfen önce bir şirket seçiniz.');
+      return;
+    }
 
     const maasNumerik = Number(maas.replace(/\./g, ''));
     if (isNaN(maasNumerik)) {
@@ -65,7 +81,9 @@ export default function Calisanlar() {
     };
 
     try {
-        const ref = await addDoc(collection(db, 'calisanlar'), yeniCalisan);
+        // Şirkete özel çalışanlar koleksiyonuna ekle
+        const calisanlarCollectionName = `calisanlar-${currentCompany.id}`;
+        const ref = await addDoc(collection(db, calisanlarCollectionName), yeniCalisan);
         const yeniCalisanId = ref.id;
 
          // Girilen maaş tarihini YYYY-MM-DD formatından parse et
@@ -84,6 +102,9 @@ export default function Calisanlar() {
 
         const batch = writeBatch(db);
 
+        // Şirkete özel giderler koleksiyonuna maaş giderlerini ekle
+        const giderlerCollectionName = `giderler-${currentCompany.id}`;
+
         for (let i = 0; ; i++) {
             // addMonthsToDate fonksiyonu artık öğlen 12:00'yi kullanıyor
             const currentMonthDate = addMonthsToDate(ilkOdemeDate, i);
@@ -100,7 +121,6 @@ export default function Calisanlar() {
             // getFullYear, getMonth, getDate gibi yerel saat dilimi metotlarını kullan.
             const formatliSonOdemeTarihi = `${currentMonthDate.getFullYear()}-${(currentMonthDate.getMonth() + 1).toString().padStart(2, '0')}-${currentMonthDate.getDate().toString().padStart(2, '0')}`;
 
-
             const giderData = {
               calisanId: yeniCalisanId,
               ad: yeniCalisan.isim,
@@ -115,7 +135,7 @@ export default function Calisanlar() {
               odendi: false,
             };
 
-            const yeniGiderRef = doc(collection(db, 'giderler'));
+            const yeniGiderRef = doc(collection(db, giderlerCollectionName));
             batch.set(yeniGiderRef, giderData);
         }
 
@@ -139,9 +159,18 @@ export default function Calisanlar() {
   const handleSil = async (id: string) => {
     if (!confirm('Çalışanı silmek istediğinize emin misiniz?')) return;
 
+    if (!currentCompany) {
+      alert('Lütfen önce bir şirket seçiniz.');
+      return;
+    }
+
     try {
+        // Şirkete özel koleksiyonlardan sil
+        const giderlerCollectionName = `giderler-${currentCompany.id}`;
+        const calisanlarCollectionName = `calisanlar-${currentCompany.id}`;
+        
         const giderQuery = query(
-            collection(db, 'giderler'),
+            collection(db, giderlerCollectionName),
             where('calisanId', '==', id),
             where('odendi', '==', false)
         );
@@ -152,7 +181,7 @@ export default function Calisanlar() {
             batch.delete(doc.ref);
         });
 
-        batch.delete(doc(db, 'calisanlar', id));
+        batch.delete(doc(db, calisanlarCollectionName, id));
 
         await batch.commit();
 
@@ -165,6 +194,29 @@ export default function Calisanlar() {
         alert("Çalışan veya ilgili giderler silinirken bir hata oluştu.");
     }
   };
+
+  // Şirket seçilmemişse uyarı göster
+  if (!currentCompany) {
+    return (
+      <div className="w-full">
+        <div className="text-center py-16">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="p-4 bg-amber-100 rounded-full">
+              <svg className="w-12 h-12 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Şirket Seçiniz</h3>
+              <p className="text-gray-500">
+                Çalışanları görüntülemek için önce bir şirket seçmeniz gerekiyor.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
